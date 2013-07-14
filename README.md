@@ -2,9 +2,7 @@
 ----------
 
 ## About ##
-**VRFSearchTool.py** is a Python application that creates a searchable index
-of all the VRFs and returns the Hostname/IP Address of the router on which
-they are configured.
+**VRFSearchTool.py** is a Python application that allows a user to search for a VRF name and returns the hostname/router of the gateway on which it is configured.
 
 ## Dependencies ##
 Exscript module [https://github.com/knipknap/exscript/](https://github.com/knipknap/exscript/)
