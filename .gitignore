@@ -219,4 +219,7 @@ pip-log.txt
 #############
 
 # Microsoft Visio
-.vsd
+*.vsd
+*.txt
+*.log
+
