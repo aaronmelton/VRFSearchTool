@@ -220,6 +220,8 @@ pip-log.txt
 
 # Microsoft Visio
 *.vsd
+
+# Application Specific
 *.txt
 *.log
 
