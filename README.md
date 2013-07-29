@@ -15,7 +15,7 @@ Exscript module [https://github.com/knipknap/exscript/](https://github.com/knipk
    or
    * Alter the `default_protocol` variable in the `get_hosts_from_file` function
    to use a different protocol enabled on your router(s).
-2. A valid username/password..
+2. A valid username/password.
 3. Presence of a `routers.txt` file containing a list, one per line, of 
    Hostnames or IP Addresses of routers on which VRF tunnels are configured.
    (If one is not provided, the application will create an example file for
@@ -69,11 +69,13 @@ Exscript module [https://github.com/knipknap/exscript/](https://github.com/knipk
    `routers.txt` file using the username and password provided by the user. 
    Using the `show run | include crypto keyring` command, the application 
    will collect all the VRFs configured on each router and write them to 
-   the `index.txt` file.  Note: If the `index.txt` file already exists, it
-   will be overwritten during this step.
-9. The application will remove all unnecessary information written to this
-    file and alphabetize the results based on VRF name.  The application will
-	then close the file.  Return to Step 2.
+   the `index.txt.tmp` file.  
+9. Removing all the unnecessary information from the `index.txt.tmp` file,
+   the application will copy the VRF Name, Customer Peer IP and Local Peer IP
+   (seperated by commas) into an `index.txt` file.  The application will then
+   remove the temporary file, `index.txt.tmp`  Return to Step 2.
+   Note: If the `index.txt` file already exists, it will be overwritten during 
+   this step.
 10. The application will display instructions for the use of the `routers.txt`
    file.  The application will also create an example file and place it in 
    its parent directory end exit (END).

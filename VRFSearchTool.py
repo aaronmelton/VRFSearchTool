@@ -65,7 +65,7 @@ def confirm(prompt="", defaultAnswer="y"):
 	while True:
 		# Convert response to lower case for comparison
 		response = raw_input(prompt).lower()
-
+	
 		# If no answer provided, assume Yes
 		if response == '':
 			return defaultAnswer
@@ -83,42 +83,53 @@ def confirm(prompt="", defaultAnswer="y"):
 			print "Please enter y or n."
 
 def searchIndex(fileName):
-# This function searches the index for search criteria provided by user and
+# This function searches the index for search string provided by user and
 # returns the results, if any are found
 
-	searchCriteria = raw_input("--> Please enter your search criteria: ")
-	try:
-		# If the index file can be opened, proceed with the search
-		with open(fileName, 'r') as openedFile:
-			# Quickly search the file for search criteria provided by user
-			# If search criteria found in the file, we will search again to return the results
-			# Otherwise inform the user their search returned no results
-			if searchCriteria in openedFile.read():
-				openedFile.seek(0)	# Reset file cursor position
-				# stripLine = openedFile.readline() <-- PULLS FIRST LINE OFF THE FILE, MAY NOT BE REQUIRED?
-				searchFile = openedFile.readlines()	# Read each line in the file one at a time
+	# Ask the user to provide search string
+	print
+	searchString = raw_input("Enter the VRF Name or IP Address you are searching for: ")
+	
+	# Repeat the question until user provides ANY input
+	while searchString == '':
+		searchString = raw_input("Enter the VRF Name or IP Address you are searching for: ")
+	
+	# As long as the user provides ANY input, the application will search for it
+	else:
+		try:
+			# If the index file can be opened, proceed with the search
+			with open(fileName, 'r') as openedFile:
+				# Quickly search the file for search string provided by user
+				# If search string found in the file, we will search again to return the results
+				# Otherwise inform the user their search returned no results
+				if searchString in openedFile.read():
+					openedFile.seek(0)	# Reset file cursor position
+					# stripLine = openedFile.readline() <-- PULLS FIRST LINE OFF THE FILE, MAY NOT BE REQUIRED?
+					searchFile = openedFile.readlines()	# Read each line in the file one at a time
 
-				print
-				print "+-----------+-----------------+-----------------+"
-				print "| VRF NAME  | Remote Peer IP  |   Our Peer IP   |"
-				print "+-----------+-----------------+-----------------+"
-
-				# Iterate through the file one at a time to find location of match
-				for line in searchFile:
-					if searchCriteria in line:
-						word = line.split(',')	# Split up matching line at the comments
-						# Format the output to make it look pretty (not raw text)
-						# Center text within column; Print word; Strip newline from last word
-						print '|{:^11}|{:^17}|{:^17}|'.format(word[0], word[1], word[2].rstrip())
-				print "+-----------+-----------------+-----------------+"
-
-			# Else: Search criteria was not found
-			else:
-				print "\nYour search criteria was not found in the index.\n"
-
-	# Exception: index file was not able to be opened
-	except IOError:
-		print "\nAn error occurred opening the index file.\n"
+					# Print table containing results
+					print
+					print "+--------------------+--------------------+--------------------+"
+					print "|      VRF NAME      | REMOTE IP ADDRESS  |  LOCAL IP ADDRESS  |"
+					print "+--------------------+--------------------+--------------------+"
+	
+					# Iterate through the file one at a time to find location of match
+					for line in searchFile:
+						if searchString in line:
+							word = line.split(',')	# Split up matching line at the comments
+							# Format the output to make it look pretty (not raw text)
+							# Center text within column; Print word; Strip newline from last word
+							print '|{:^20}|{:^20}|{:^20}|'.format(word[0], word[1], word[2].rstrip())
+					# Close up the table after the search is complete
+					print "+--------------------+--------------------+--------------------+"
+	
+				# Else: Search string was not found
+				else:
+					print "\nYour search string was not found in the index.\n"
+	
+		# Exception: index file was not able to be opened
+		except IOError:
+			print "\nAn error occurred opening the index file.\n"
 							 
 #@log_to(Logger())	# Logging decorator; Must precede buildIndex!
 					# Logging (to screen) not useful unless # threads > 1
@@ -127,10 +138,11 @@ def buildIndex(job, host, socket):
 # This function builds the index file by connecting to the router and extracting all
 # matching sections.  I chose to search for 'crypto keyring' because it is the only
 # portion of a VPN config that contains the VRF name AND Peer IP.  Caveat is that
-# the program briefly captures the pre-shared key.  'crypto isakmp profile' was not
+# the program temporarily captures the pre-shared key.  'crypto isakmp profile' was not
 # a suitable query due to the possibility of multiple 'match identity address' statements
 
-	print("Building index...\n")		# Let the user know the program is working dot dot dot
+	print	# Added to create some white space between prompts
+	print("Building index...")		# Let the user know the program is working dot dot dot
 	socket.execute("terminal length 0")	# Disable user-prompt to page through config
 										# Exscript doesn't always recognize Cisco IOS
 										# for socket.autoinit() to work correctly
@@ -144,18 +156,19 @@ def buildIndex(job, host, socket):
 	outputFile.close()					# Close output file
 	socket.send("exit\r")				# Send the "exit" command to log out of router gracefully
 	socket.close()						# Close SSH connection
-	cleanIndex(indexFileTmp, host)		# Execute function to cleanup the index file
+
+	cleanIndex(indexFileTmp, host)		# Execute function to clean-up the index file
 	
 def cleanIndex(indexFileTmp, host):
 # This function strips all the unnecessary information collected from the router leaving
 # only the VRF name, remote Peer IP and local hostname or IP
 
 	try:
-		# If the temporary index file can be opened, proceed with cleanup
+		# If the temporary index file can be opened, proceed with clean-up
 		with open(indexFileTmp, 'r') as srcIndex:
 
 			try:
-				# If the actual index file can be opened, proceed with cleanup
+				# If the actual index file can be opened, proceed with clean-up
 				# Remove unnecessary details from the captured config
 				with open(indexFile, 'a') as dstIndex:
 					# Use REGEX to step through config and remove everything but
@@ -179,9 +192,14 @@ def cleanIndex(indexFileTmp, host):
 	# Always remove the temporary index file
 	finally:
 		os.remove(indexFileTmp)	# Critical to remove temporary file as it contains passwords!
-		
-	
+			
 def routerLogin():
+# This function prompts the user to provide their login credentials and logs into each
+# of the routers before calling the buildIndex function to extract relevant portions of
+# the router config.  As designed, this function actually has the capability to login to
+# multiple routers simultaneously.  I chose to not allow it to multi-thread given possibility
+# of undesirable results from multiple threads writing to the same index file simultaneously
+
 	try:# Check for existence of routerFile; If exists, continue with program
 		with open(routerFile, 'r'): pass
 		
@@ -205,92 +223,72 @@ def routerLogin():
 # Determine OS in use and clear screen of previous output
 os.system('cls' if os.name=='nt' else 'clear')
 
-print "VRFSearchTool.py v0.06"
-print "----------------------"
+print "VRF Search Tool v0.07 Alpha"
+print "---------------------------"
 
+# Change the filenames of these variables to suit your needs
 routerFile='routers.txt'
 indexFile='index.txt'
 indexFileTmp='index.txt.tmp'
 
 # START PROGRAM
+# Steps below refer to documented program flow in VRFSearchTool.png
 # Step 1: Check for presence of routerFile
 # Does routerFile exist?
-print("START PROGRAM")
-print("Step 1: Check for presence of "+routerFile+" file")
-print("Does "+routerFile+" exist?")
 if fileExist(routerFile):
-	# Step 2: Check for presence of index.txt file
-	# Does index.txt exist?
-	print("<YES>") # routerFile exists
-	print("Step 2: Check for presence of index.txt file")
-	print("Does index.txt exist?")
+	# Step 2: Check for presence of indexFile file
+	# Does indexFile exist?
 	if fileExist(indexFile):
 		# Step 3: Check date of file
 		# File created today?
-		print("<YES>") # index.txt exists
-		print("Step 3: Check date of file")
-		print("File created today?")
 		if upToDate(indexFile):
-			# Step 4: Prompt user to provide search criteria
+			# Step 4: Prompt user to provide search string
 			# Step 5: Search and return results, if any
 			# END PROGRAM
-			print("<YES>") # index.txt up to date
-			print("Step 4: Prompt user to provide search criteria")
-			print("Step 5: Search and return results, if any")
+			print
+			print("--> Index found and appears up to date.")
 			searchIndex(indexFile)
-			print("END PROGRAM")
+			print
 		else: # if upToDate(indexFile):
-			# Step 6: Ask user if they would like to update index.txt
-			# Update index.txt?
-			print("<NO>") # index.txt not up to date
-			print("Step 6: Ask user if they would like to update index.txt")
-			print("Update index.txt?")
-			if confirm("Would you like to update the index? [Y/n] "):
+			# Step 6: Ask user if they would like to update indexFile
+			# Update indexFile?
+			if confirm("The index does not appear up-to-date. Would you like to update it? [Y/n] "):
 				# Step 7: Prompt user for username & password
 				# Step 8: Login to routers and retrieve VRF, Peer information
-				# Step 9: Sort index.txt to remove unnecessary data
-				# GOTO Step 2 (Check for presence of index.txt file)
-				print("<YES>") # update index.txt
-				print("Step 7: Prompt user for username & password")
-				print("Step 8: Login to routers and retrieve VRF, Peer information")
+				# Step 9: Sort indexFile to remove unnecessary data
+				# GOTO Step 2 (Check for presence of indexFile file)
 				routerLogin()
-				print("Step 9: Sort index.txt to remove unnecessary data")
-				print("GOTO Step 2 (Check for presence of index.txt file)")
 				searchIndex(indexFile)
 			else: # if confirm("Would you like to update the index? [Y/n] "):
-				# GOTO Step 4: (Prompt user to provide search criteria)
+				# GOTO Step 4: (Prompt user to provide search string)
 				# Step 5: Search and return results, if any
-				print("<NO>") # don't update index.txt
-				print("GOTO Step 4: (Prompt user to provide search criteria)")
-				print("Step 5: Search and return results, if any")
 				searchIndex(indexFile)
-				print("END PROGRAM")
+				print
 	else: # if fileExist(indexFile):
 		# Step 7: Prompt user for username & password
 		# Step 8: Login to routers and retrieve VRF, Peer information
-		# Step 9: Sort index.txt to remove unnecessary data
-		# GOTO Step 2 (Check for presence of index.txt file)
-		print("<NO>") # index.txt does not exist
-		print("Step 7: Prompt user for username & password")
-		print("Step 8: Login to router and retrieve VRF, Peer information")
+		# Step 9: Sort indexFile to remove unnecessary data
+		# GOTO Step 2 (Check for presence of indexFile file)
+		print
+		print("--> No index file found, we will now create one.")
+		print
 		routerLogin()
-		print("Step 9: Sort index.txt to remove unnecessary data")
-		print("GOTO Step 2 (Check for presence of index.txt file)")
 		searchIndex(indexFile)
 		
 else: # if fileExist(routerFile):
 	# Step 10: Create example routerFile and exit program
 	# END PROGRAM	
-	print("<NO>") # routerFile does not exist
-	print("Step 10: Create example "+routerFile+" file and exit program")
 	try:
 		with open (routerFile, 'w') as exampleFile:
 			exampleFile.write("192.168.1.1\n192.168.1.2\nRouterA\nRouterB\nRouterC\netc...")
+			print
 			print "Required file "+routerFile+" not found; One has been created for you."
 			print "This file must contain a list, one per line, of Hostnames or IP addresses the"
 			print "application will then connect to download the running-config."
+			print
 	except IOError:
+		print
 		print "Required file "+routerFile+" not found."
 		print "This file must contain a list, one per line, of Hostnames or IP addresses the"
 		print "application will then connect to download the running-config."
-	print("END PROGRAM")
+		print
