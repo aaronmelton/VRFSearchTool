@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # VRFSearchTool.py
-# Copyright (C) 2012-2013 Aaron Melton <aaron(at)aaronmelton(dot)com>
+# Copyright (C) 2013 Aaron Melton <aaron(at)aaronmelton(dot)com>
 # 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -141,7 +141,6 @@ def buildIndex(job, host, socket):
 # the program temporarily captures the pre-shared key.  'crypto isakmp profile' was not
 # a suitable query due to the possibility of multiple 'match identity address' statements
 
-	print	# Added to create some white space between prompts
 	print("Building index...")		# Let the user know the program is working dot dot dot
 	socket.execute("terminal length 0")	# Disable user-prompt to page through config
 										# Exscript doesn't always recognize Cisco IOS
@@ -209,6 +208,7 @@ def routerLogin():
 	
 		queue = Queue(verbose=0, max_threads=1)	# Minimal message from queue, 1 threads
 		queue.add_account(userCreds)			# Use supplied user credentials
+		print	# Added to create some white space between prompts
 		queue.run(hosts, buildIndex)			# Create queue using provided hosts
 		queue.shutdown()						# End all running threads and close queue
 		
@@ -223,8 +223,8 @@ def routerLogin():
 # Determine OS in use and clear screen of previous output
 os.system('cls' if os.name=='nt' else 'clear')
 
-print "VRF Search Tool v0.07 Alpha"
-print "---------------------------"
+print "VRF Search Tool v0.0.8-alpha"
+print "----------------------------"
 
 # Change the filenames of these variables to suit your needs
 routerFile='routers.txt'
@@ -252,11 +252,13 @@ if fileExist(routerFile):
 		else: # if upToDate(indexFile):
 			# Step 6: Ask user if they would like to update indexFile
 			# Update indexFile?
-			if confirm("The index does not appear up-to-date. Would you like to update it? [Y/n] "):
+			print
+			if confirm("The index does not appear up-to-date.\n\nWould you like to update it? [Y/n] "):
 				# Step 7: Prompt user for username & password
 				# Step 8: Login to routers and retrieve VRF, Peer information
 				# Step 9: Sort indexFile to remove unnecessary data
 				# GOTO Step 2 (Check for presence of indexFile file)
+				print
 				routerLogin()
 				searchIndex(indexFile)
 			else: # if confirm("Would you like to update the index? [Y/n] "):
@@ -270,7 +272,7 @@ if fileExist(routerFile):
 		# Step 9: Sort indexFile to remove unnecessary data
 		# GOTO Step 2 (Check for presence of indexFile file)
 		print
-		print("--> No index file found, we will now create one.")
+		print("--> No index file found, we will create one now.")
 		print
 		routerLogin()
 		searchIndex(indexFile)
