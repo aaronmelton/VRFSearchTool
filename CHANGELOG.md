@@ -1,6 +1,9 @@
 # VRFSearchTool.py #
 ---
 
+## VRFSearchTool v0.0.9-alpha (2013-07-31) ##
+* Creating temporary new branch to correct Issue #1 & Issue #2
+
 ## VRFSearchTool v0.0.8-alpha (2013-07-29) ##
 * Updated CHANGELOG.md, README.md, TODO.md
 * Minor corrections to code comments

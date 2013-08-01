@@ -104,7 +104,6 @@ def searchIndex(fileName):
 				# Otherwise inform the user their search returned no results
 				if searchString in openedFile.read():
 					openedFile.seek(0)	# Reset file cursor position
-					# stripLine = openedFile.readline() <-- PULLS FIRST LINE OFF THE FILE, MAY NOT BE REQUIRED?
 					searchFile = openedFile.readlines()	# Read each line in the file one at a time
 
 					# Print table containing results
@@ -173,7 +172,7 @@ def cleanIndex(indexFileTmp, host):
 					# Use REGEX to step through config and remove everything but
 					# the VRF Name, Peer IP & append router hostname/IP to the end
 					a = srcIndex.read()
-					b = re.sub(r'show running-config \| section crypto', '', a)
+					b = re.sub(r'show running-config \| section crypto keyring.*', '', a)
 					c = re.sub(r'crypto keyring ', '' ,b)
 					d = re.sub(r'.(\r?\n)..pre-shared-key.address.', ',' ,c)
 					e = re.sub(r'.key.*\r', ','+host.get_name() ,d)
@@ -223,7 +222,7 @@ def routerLogin():
 # Determine OS in use and clear screen of previous output
 os.system('cls' if os.name=='nt' else 'clear')
 
-print "VRF Search Tool v0.0.8-alpha"
+print "VRF Search Tool v0.0.9-alpha"
 print "----------------------------"
 
 # Change the filenames of these variables to suit your needs
@@ -259,6 +258,8 @@ if fileExist(routerFile):
 				# Step 9: Sort indexFile to remove unnecessary data
 				# GOTO Step 2 (Check for presence of indexFile file)
 				print
+				# Remove old indexFile to prevent duplicates from being added by appends
+				os.remove(indexFile)
 				routerLogin()
 				searchIndex(indexFile)
 			else: # if confirm("Would you like to update the index? [Y/n] "):
