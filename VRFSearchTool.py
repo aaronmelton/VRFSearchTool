@@ -222,7 +222,7 @@ def routerLogin():
 # Determine OS in use and clear screen of previous output
 os.system('cls' if os.name=='nt' else 'clear')
 
-print "VRF Search Tool v0.0.9-alpha"
+print "VRF Search Tool v0.0.10-beta"
 print "----------------------------"
 
 # Change the filenames of these variables to suit your needs

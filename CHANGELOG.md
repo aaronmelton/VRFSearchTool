@@ -1,6 +1,10 @@
 # VRFSearchTool.py #
 ---
 
+## VRFSearchTool v0.0.10-beta (2013-08-12) ##
+* Changes implemented in v0.0.9-alpha corrected all known bugs; Pushing 
+  application into 'beta' status for production environments.
+  
 ## VRFSearchTool v0.0.9-alpha (2013-07-31) ##
 * Creating temporary new branch to correct Issue #1 & Issue #2
 

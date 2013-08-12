@@ -4,10 +4,10 @@
 Assuming Python is in your path environment variable, you can execute the
 script directly from the command-line:
 
-    python VRFSearchTool
+    python VRFSearchTool.py
 
 Personally, I use the Pyinstaller module, [http://www.pyinstaller.org/](http://www.pyinstaller.org/)
 to compile everything into a single binary to execute from the Windows
 command-line:
 
-    python pyinstaller.py VRFSearchTool --onefile
+    python pyinstaller.py VRFSearchTool.py --onefile
