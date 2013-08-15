@@ -20,8 +20,8 @@
 
 import datetime	# Required for date format
 import Exscript	# Required for SSH, queue & logging functionality
-import os		# Required to determine OS of host
 import re		# Required for REGEX operations
+import os		# Required to determine OS of host
 
 from datetime                   import datetime
 from Exscript                   import Queue, Host, Logger
@@ -31,31 +31,70 @@ from Exscript.util.log          import log_to
 from Exscript.util.decorator    import autologin
 from Exscript.util.interact     import read_login
 from Exscript.util.report		import status,summarize
+from re							import sub
+from os							import name, remove, system
 
-def fileExist(fileName):
-# This function checks the parent directory for the presence of a file
-# Returns true if found, false if not
+
+#@log_to(Logger())	# Logging decorator; Must precede buildIndex!
+					# Logging (to screen) not useful unless # threads > 1
+@autologin()		# Exscript login decorator; Must precede buildIndex!
+def buildIndex(job, host, socket):
+# This function builds the index file by connecting to the router and extracting all
+# matching sections.  I chose to search for 'crypto keyring' because it is the only
+# portion of a VPN config that contains the VRF name AND Peer IP.  Caveat is that
+# the program temporarily captures the pre-shared key.  'crypto isakmp profile' was not
+# a suitable query due to the possibility of multiple 'match identity address' statements
+
+	print("Building index...")		# Let the user know the program is working dot dot dot
+	socket.execute("terminal length 0")	# Disable user-prompt to page through config
+										# Exscript doesn't always recognize Cisco IOS
+										# for socket.autoinit() to work correctly
+
+	# Send command to router to capture results
+	socket.execute("show running-config | section crypto keyring")
+
+	outputFile = file(indexFileTmp, 'a')	# Open output file (will overwrite contents)
+
+	outputFile.write(socket.response)	# Write contents of running config to output file
+	outputFile.close()					# Close output file
+	socket.send("exit\r")				# Send the "exit" command to log out of router gracefully
+	socket.close()						# Close SSH connection
+
+	cleanIndex(indexFileTmp, host)		# Execute function to clean-up the index file
+	
+def cleanIndex(indexFileTmp, host):
+# This function strips all the unnecessary information collected from the router leaving
+# only the VRF name, remote Peer IP and local hostname or IP
 
 	try:
-		# If file can be opened, it must exist
-		with open(fileName, 'r') as openedFile:
-			return 1	# File found
+		# If the temporary index file can be opened, proceed with clean-up
+		with open(indexFileTmp, 'r') as srcIndex:
 
-	# Exception: file cannot be opened, must not exist
+			try:
+				# If the actual index file can be opened, proceed with clean-up
+				# Remove unnecessary details from the captured config
+				with open(indexFile, 'a') as dstIndex:
+					# Use REGEX to step through config and remove everything but
+					# the VRF Name, Peer IP & append router hostname/IP to the end
+					a = srcIndex.read()
+					b = sub(r'show running-config \| section crypto keyring.*', '', a)
+					c = sub(r'crypto keyring ', '' ,b)
+					d = sub(r'.(\r?\n)..pre-shared-key.address.', ',' ,c)
+					e = sub(r'.key.*\r', ','+host.get_name() ,d)
+					f = sub(r'.*#', '', e)
+					dstIndex.write(f)
+
+			# Exception: actual index file was not able to be opened
+			except IOError:
+				print "\nAn error occurred opening the index file.\n"
+
+	# Exception: temporary index file was not able to be opened
 	except IOError:
-		return 0		# File NOT found
-
-def upToDate(fileName):
-# This function checks the modify date of the index file
-# Returns true if file was last modified today, false if the file is older than today
-
-	# If the modify date of the file is equal to today's date
-	if datetime.fromtimestamp(os.path.getmtime(fileName)).date() == datetime.today().date():
-		return 1	# File is "up-to-date" (modified today)
-
-	# Else the modify date of the index file is not today's date
-	else:
-		return 0	# File is older than today's date
+		print "\nAn error occurred opening the temporary index file.\n"
+	
+	# Always remove the temporary index file
+	finally:
+		remove(indexFileTmp)	# Critical to remove temporary file as it contains passwords!
 
 def confirm(prompt="", defaultAnswer="y"):
 # This function prompts the user to answer "y" for yes or "n" for no
@@ -72,7 +111,7 @@ def confirm(prompt="", defaultAnswer="y"):
 	
 		# If response is Yes, return true
 		elif response == 'y':
-			return 1
+			return True
 	
 		# If response is No, return false
 		elif response == 'n':
@@ -81,6 +120,19 @@ def confirm(prompt="", defaultAnswer="y"):
 		# If response is neither Yes or No, repeat the question
 		else:
 			print "Please enter y or n."
+
+def fileExist(fileName):
+# This function checks the parent directory for the presence of a file
+# Returns true if found, false if not
+
+	try:
+		# If file can be opened, it must exist
+		with open(fileName, 'r') as openedFile:
+			return True	# File found
+
+	# Exception: file cannot be opened, must not exist
+	except IOError:
+		return 0		# File NOT found
 
 def searchIndex(fileName):
 # This function searches the index for search string provided by user and
@@ -130,67 +182,6 @@ def searchIndex(fileName):
 		except IOError:
 			print "\nAn error occurred opening the index file.\n"
 							 
-#@log_to(Logger())	# Logging decorator; Must precede buildIndex!
-					# Logging (to screen) not useful unless # threads > 1
-@autologin()		# Exscript login decorator; Must precede buildIndex!
-def buildIndex(job, host, socket):
-# This function builds the index file by connecting to the router and extracting all
-# matching sections.  I chose to search for 'crypto keyring' because it is the only
-# portion of a VPN config that contains the VRF name AND Peer IP.  Caveat is that
-# the program temporarily captures the pre-shared key.  'crypto isakmp profile' was not
-# a suitable query due to the possibility of multiple 'match identity address' statements
-
-	print("Building index...")		# Let the user know the program is working dot dot dot
-	socket.execute("terminal length 0")	# Disable user-prompt to page through config
-										# Exscript doesn't always recognize Cisco IOS
-										# for socket.autoinit() to work correctly
-
-	# Send command to router to capture results
-	socket.execute("show running-config | section crypto keyring")
-
-	outputFile = file(indexFileTmp, 'a')	# Open output file (will overwrite contents)
-
-	outputFile.write(socket.response)	# Write contents of running config to output file
-	outputFile.close()					# Close output file
-	socket.send("exit\r")				# Send the "exit" command to log out of router gracefully
-	socket.close()						# Close SSH connection
-
-	cleanIndex(indexFileTmp, host)		# Execute function to clean-up the index file
-	
-def cleanIndex(indexFileTmp, host):
-# This function strips all the unnecessary information collected from the router leaving
-# only the VRF name, remote Peer IP and local hostname or IP
-
-	try:
-		# If the temporary index file can be opened, proceed with clean-up
-		with open(indexFileTmp, 'r') as srcIndex:
-
-			try:
-				# If the actual index file can be opened, proceed with clean-up
-				# Remove unnecessary details from the captured config
-				with open(indexFile, 'a') as dstIndex:
-					# Use REGEX to step through config and remove everything but
-					# the VRF Name, Peer IP & append router hostname/IP to the end
-					a = srcIndex.read()
-					b = re.sub(r'show running-config \| section crypto keyring.*', '', a)
-					c = re.sub(r'crypto keyring ', '' ,b)
-					d = re.sub(r'.(\r?\n)..pre-shared-key.address.', ',' ,c)
-					e = re.sub(r'.key.*\r', ','+host.get_name() ,d)
-					f = re.sub(r'.*#', '', e)
-					dstIndex.write(f)
-
-			# Exception: actual index file was not able to be opened
-			except IOError:
-				print "\nAn error occurred opening the index file.\n"
-
-	# Exception: temporary index file was not able to be opened
-	except IOError:
-		print "\nAn error occurred opening the temporary index file.\n"
-	
-	# Always remove the temporary index file
-	finally:
-		os.remove(indexFileTmp)	# Critical to remove temporary file as it contains passwords!
-			
 def routerLogin():
 # This function prompts the user to provide their login credentials and logs into each
 # of the routers before calling the buildIndex function to extract relevant portions of
@@ -218,9 +209,22 @@ def routerLogin():
 	except IOError:
 		print "\nAn error occurred opening the router file.\n"
 
+def upToDate(fileName):
+# This function checks the modify date of the index file
+# Returns true if file was last modified today, false if the file is older than today
+
+	# If the modify date of the file is equal to today's date
+	if datetime.fromtimestamp(os.path.getmtime(fileName)).date() == datetime.today().date():
+		return True	# File is "up-to-date" (modified today)
+
+	# Else the modify date of the index file is not today's date
+	else:
+		return 0	# File is older than today's date
+
+
 
 # Determine OS in use and clear screen of previous output
-os.system('cls' if os.name=='nt' else 'clear')
+system('cls' if name=='nt' else 'clear')
 
 print "VRF Search Tool v0.0.10-beta"
 print "----------------------------"
@@ -259,7 +263,7 @@ if fileExist(routerFile):
 				# GOTO Step 2 (Check for presence of indexFile file)
 				print
 				# Remove old indexFile to prevent duplicates from being added by appends
-				os.remove(indexFile)
+				remove(indexFile)
 				routerLogin()
 				searchIndex(indexFile)
 			else: # if confirm("Would you like to update the index? [Y/n] "):

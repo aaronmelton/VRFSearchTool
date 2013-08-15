@@ -1,7 +1,13 @@
 # VRFSearchTool.py #
 ---
 
-## VRFSearchTool v0.0.10-beta (2013-08-12) ##
+## VRFSearchTool v0.0.11-beta (2013-08-15) ##
+* Cleaned up module importing
+
+## VRFSearchTool v0.0.10-beta (2013-08-15) ##
+* Alphabetized functions
+
+  ## VRFSearchTool v0.0.10-beta (2013-08-12) ##
 * Changes implemented in v0.0.9-alpha corrected all known bugs; Pushing 
   application into 'beta' status for production environments.
   

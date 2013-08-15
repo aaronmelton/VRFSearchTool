@@ -72,7 +72,7 @@ Exscript module [https://github.com/knipknap/exscript/](https://github.com/knipk
    the `index.txt.tmp` file.  
 9. Removing all the unnecessary information from the `index.txt.tmp` file,
    the application will copy the VRF Name, Customer Peer IP and Local Peer IP
-   (seperated by commas) into an `index.txt` file.  The application will then
+   (separated by commas) into an `index.txt` file.  The application will then
    remove the temporary file, `index.txt.tmp`  Return to Step 2.
    Note: If the `index.txt` file already exists, it will be overwritten during 
    this step.
