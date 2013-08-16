@@ -1,6 +1,12 @@
 # VRFSearchTool.py #
 ---
 
+## VRFSearchTool v0.0.12-beta (2013-08-16) ##
+* Updated error messages so they reflect the actual filename as read
+  from the configFile.
+* Rewrote "Building index..." message so it does not take up most of the
+  screen when working with a large batch of routers.
+  
 ## VRFSearchTool v0.0.11-beta (2013-08-15) ##
 * Cleaned up module importing
 

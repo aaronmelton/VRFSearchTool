@@ -18,10 +18,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-import datetime	# Required for date format
-import Exscript	# Required for SSH, queue & logging functionality
-import re		# Required for REGEX operations
-import os		# Required to determine OS of host
+import datetime		# Required for date format
+import Exscript		# Required for SSH, queue & logging functionality
+import re			# Required for REGEX operations
+import sys			# Required for printing without newline
+import os			# Required to determine OS of host
 
 from datetime                   import datetime
 from Exscript                   import Queue, Host, Logger
@@ -32,6 +33,7 @@ from Exscript.util.decorator    import autologin
 from Exscript.util.interact     import read_login
 from Exscript.util.report		import status,summarize
 from re							import sub
+from sys						import stdout
 from os							import name, remove, system
 
 
@@ -45,7 +47,7 @@ def buildIndex(job, host, socket):
 # the program temporarily captures the pre-shared key.  'crypto isakmp profile' was not
 # a suitable query due to the possibility of multiple 'match identity address' statements
 
-	print("Building index...")		# Let the user know the program is working dot dot dot
+	stdout.write('.')					# Write period without trailing newline
 	socket.execute("terminal length 0")	# Disable user-prompt to page through config
 										# Exscript doesn't always recognize Cisco IOS
 										# for socket.autoinit() to work correctly
@@ -86,11 +88,11 @@ def cleanIndex(indexFileTmp, host):
 
 			# Exception: actual index file was not able to be opened
 			except IOError:
-				print "\nAn error occurred opening the index file.\n"
+				print "\n--> An error occurred opening "+indexFile+".\n"
 
 	# Exception: temporary index file was not able to be opened
 	except IOError:
-		print "\nAn error occurred opening the temporary index file.\n"
+		print "\n--> An error occurred opening "+indexFileTmp+".\n"
 	
 	# Always remove the temporary index file
 	finally:
@@ -176,11 +178,11 @@ def searchIndex(fileName):
 	
 				# Else: Search string was not found
 				else:
-					print "\nYour search string was not found in the index.\n"
+					print "\n--> Your search string was not found in "+indexFile+".\n"
 	
 		# Exception: index file was not able to be opened
 		except IOError:
-			print "\nAn error occurred opening the index file.\n"
+			print "\n--> An error occurred opening "+indexFile+".\n"
 							 
 def routerLogin():
 # This function prompts the user to provide their login credentials and logs into each
@@ -198,7 +200,8 @@ def routerLogin():
 	
 		queue = Queue(verbose=0, max_threads=1)	# Minimal message from queue, 1 threads
 		queue.add_account(userCreds)			# Use supplied user credentials
-		print	# Added to create some white space between prompts
+		print
+		stdout.write("--> Building index...") 	# Print without trailing newline
 		queue.run(hosts, buildIndex)			# Create queue using provided hosts
 		queue.shutdown()						# End all running threads and close queue
 		
@@ -207,7 +210,7 @@ def routerLogin():
 
 	# Exception: router file was not able to be opened
 	except IOError:
-		print "\nAn error occurred opening the router file.\n"
+		print "\n--> An error occurred opening "+routerFile+".\n"
 
 def upToDate(fileName):
 # This function checks the modify date of the index file
@@ -226,7 +229,7 @@ def upToDate(fileName):
 # Determine OS in use and clear screen of previous output
 system('cls' if name=='nt' else 'clear')
 
-print "VRF Search Tool v0.0.10-beta"
+print "VRF Search Tool v0.0.12-beta"
 print "----------------------------"
 
 # Change the filenames of these variables to suit your needs
@@ -265,6 +268,7 @@ if fileExist(routerFile):
 				# Remove old indexFile to prevent duplicates from being added by appends
 				remove(indexFile)
 				routerLogin()
+				print
 				searchIndex(indexFile)
 			else: # if confirm("Would you like to update the index? [Y/n] "):
 				# GOTO Step 4: (Prompt user to provide search string)
@@ -280,6 +284,7 @@ if fileExist(routerFile):
 		print("--> No index file found, we will create one now.")
 		print
 		routerLogin()
+		print
 		searchIndex(indexFile)
 		
 else: # if fileExist(routerFile):
