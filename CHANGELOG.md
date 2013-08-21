@@ -1,6 +1,14 @@
 # VRFSearchTool.py #
 ---
 
+## VRFSearchTool v0.0.13-beta (2013-08-20) ##
+* Adjusted output spacing (removing/moving 'print' statements)
+* Added additional comments to code, configFile, routerFile.
+* Added configFile functionality to give application the ability to retrieve
+  user-specified settings from a config file.  Application use now extended
+  such that the list of routers, index and respective paths can be specified
+  in the file.  Application can also use configured username and password.
+
 ## VRFSearchTool v0.0.12-beta (2013-08-16) ##
 * Updated error messages so they reflect the actual filename as read
   from the configFile.

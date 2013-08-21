@@ -18,27 +18,33 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+import base64		# Required to decode password
 import datetime		# Required for date format
+import ConfigParser # Required for configuration file
 import Exscript		# Required for SSH, queue & logging functionality
 import re			# Required for REGEX operations
 import sys			# Required for printing without newline
 import os			# Required to determine OS of host
 
+from base64						import b64decode
+from ConfigParser				import ConfigParser
 from datetime                   import datetime
-from Exscript                   import Queue, Host, Logger
+from Exscript                   import Account, Queue, Host, Logger
 from Exscript.protocols 		import SSH2
 from Exscript.util.file			import get_hosts_from_file
 from Exscript.util.log          import log_to
 from Exscript.util.decorator    import autologin
 from Exscript.util.interact     import read_login
 from Exscript.util.report		import status,summarize
-from re							import sub
+from re							import search, sub
 from sys						import stdout
-from os							import name, remove, system
+from os							import name, path, remove, system
 
 
-#@log_to(Logger())	# Logging decorator; Must precede buildIndex!
-					# Logging (to screen) not useful unless # threads > 1
+def version():
+# This function tracks the application version.
+	return "v0.0.13-beta"
+
 @autologin()		# Exscript login decorator; Must precede buildIndex!
 def buildIndex(job, host, socket):
 # This function builds the index file by connecting to the router and extracting all
@@ -55,12 +61,15 @@ def buildIndex(job, host, socket):
 	# Send command to router to capture results
 	socket.execute("show running-config | section crypto keyring")
 
-	outputFile = file(indexFileTmp, 'a')	# Open output file (will overwrite contents)
+	with open(indexFileTmp, 'a') as outputFile:
+		try:
+			outputFile.write(socket.response)	# Write contents of running config to output file
+		except IOError:
+			print
+			print "--> An error occurred opening "+indexFileTmp+"."
 
-	outputFile.write(socket.response)	# Write contents of running config to output file
-	outputFile.close()					# Close output file
-	socket.send("exit\r")				# Send the "exit" command to log out of router gracefully
-	socket.close()						# Close SSH connection
+	socket.send("exit\r")	# Send the "exit" command to log out of router gracefully
+	socket.close()			# Close SSH connection
 
 	cleanIndex(indexFileTmp, host)		# Execute function to clean-up the index file
 	
@@ -88,11 +97,13 @@ def cleanIndex(indexFileTmp, host):
 
 			# Exception: actual index file was not able to be opened
 			except IOError:
-				print "\n--> An error occurred opening "+indexFile+".\n"
+				print
+				print "--> An error occurred opening "+indexFile+"."
 
 	# Exception: temporary index file was not able to be opened
 	except IOError:
-		print "\n--> An error occurred opening "+indexFileTmp+".\n"
+		print
+		print "--> An error occurred opening "+indexFileTmp+"."
 	
 	# Always remove the temporary index file
 	finally:
@@ -117,7 +128,7 @@ def confirm(prompt="", defaultAnswer="y"):
 	
 		# If response is No, return false
 		elif response == 'n':
-			return 0
+			return False
 	
 		# If response is neither Yes or No, repeat the question
 		else:
@@ -134,7 +145,46 @@ def fileExist(fileName):
 
 	# Exception: file cannot be opened, must not exist
 	except IOError:
-		return 0		# File NOT found
+		return False	# File NOT found
+
+def routerLogin():
+# This function prompts the user to provide their login credentials and logs into each
+# of the routers before calling the buildIndex function to extract relevant portions of
+# the router config.  As designed, this function actually has the capability to login to
+# multiple routers simultaneously.  I chose to not allow it to multi-thread given possibility
+# of undesirable results from multiple threads writing to the same index file simultaneously
+
+	try:# Check for existence of routerFile; If exists, continue with program
+		with open(routerFile, 'r'): pass
+		
+		# Read hosts from specified file & remove duplicate entries, set protocol to SSH2
+		hosts = get_hosts_from_file(routerFile,default_protocol='ssh2',remove_duplicates=True)
+
+		if username == '':				# If username is blank
+			print
+			account = read_login()		# Prompt the user for login credentials
+
+		elif password == '':			# If password is blank
+			print
+			account = read_login()		# Prompt the user for login credentials
+
+		else:							# Else use username/password from configFile
+			account = Account(name=username, password=b64decode(password))
+		
+		queue = Queue(verbose=0, max_threads=1)	# Minimal message from queue, 1 threads
+		queue.add_account(account)				# Use supplied user credentials
+		print
+		stdout.write("--> Building index...") 	# Print without trailing newline
+		queue.run(hosts, buildIndex)			# Create queue using provided hosts
+		queue.shutdown()						# End all running threads and close queue
+		
+		#print status(Logger())	# Print current % status of operation to screen
+								# Status not useful unless # threads > 1
+
+	# Exception: router file was not able to be opened
+	except IOError:
+		print
+		print "--> An error occurred opening "+routerFile+"."
 
 def searchIndex(fileName):
 # This function searches the index for search string provided by user and
@@ -178,129 +228,126 @@ def searchIndex(fileName):
 	
 				# Else: Search string was not found
 				else:
-					print "\n--> Your search string was not found in "+indexFile+".\n"
+					print
+					print "--> Your search string was not found in "+indexFile+"."
 	
 		# Exception: index file was not able to be opened
 		except IOError:
-			print "\n--> An error occurred opening "+indexFile+".\n"
+			print
+			print "--> An error occurred opening "+indexFile+"."
 							 
-def routerLogin():
-# This function prompts the user to provide their login credentials and logs into each
-# of the routers before calling the buildIndex function to extract relevant portions of
-# the router config.  As designed, this function actually has the capability to login to
-# multiple routers simultaneously.  I chose to not allow it to multi-thread given possibility
-# of undesirable results from multiple threads writing to the same index file simultaneously
-
-	try:# Check for existence of routerFile; If exists, continue with program
-		with open(routerFile, 'r'): pass
-		
-		# Read hosts from specified file & remove duplicate entries, set protocol to SSH2
-		hosts = get_hosts_from_file(routerFile,default_protocol='ssh2',remove_duplicates=True)
-		userCreds = read_login()	# Prompt the user for his name and password
-	
-		queue = Queue(verbose=0, max_threads=1)	# Minimal message from queue, 1 threads
-		queue.add_account(userCreds)			# Use supplied user credentials
-		print
-		stdout.write("--> Building index...") 	# Print without trailing newline
-		queue.run(hosts, buildIndex)			# Create queue using provided hosts
-		queue.shutdown()						# End all running threads and close queue
-		
-		#print status(Logger())	# Print current % status of operation to screen
-								# Status not useful unless # threads > 1
-
-	# Exception: router file was not able to be opened
-	except IOError:
-		print "\n--> An error occurred opening "+routerFile+".\n"
-
 def upToDate(fileName):
 # This function checks the modify date of the index file
 # Returns true if file was last modified today, false if the file is older than today
 
 	# If the modify date of the file is equal to today's date
-	if datetime.fromtimestamp(os.path.getmtime(fileName)).date() == datetime.today().date():
+	if datetime.fromtimestamp(path.getmtime(fileName)).date() == datetime.today().date():
 		return True	# File is "up-to-date" (modified today)
 
 	# Else the modify date of the index file is not today's date
 	else:
-		return 0	# File is older than today's date
+		return False	# File is older than today's date
 
 
+# Change the filenames of these variables to suit your needs
+configFile='settings.cfg'
 
 # Determine OS in use and clear screen of previous output
 system('cls' if name=='nt' else 'clear')
 
-print "VRF Search Tool v0.0.12-beta"
-print "----------------------------"
+# PRINT PROGRAM BANNER
+print "VRF Search Tool "+version()
+print "-"*(16+len(version()))
 
-# Change the filenames of these variables to suit your needs
-routerFile='routers.txt'
-indexFile='index.txt'
-indexFileTmp='index.txt.tmp'
-
-# START PROGRAM
-# Steps below refer to documented program flow in VRFSearchTool.png
-# Step 1: Check for presence of routerFile
-# Does routerFile exist?
-if fileExist(routerFile):
-	# Step 2: Check for presence of indexFile file
-	# Does indexFile exist?
-	if fileExist(indexFile):
-		# Step 3: Check date of file
-		# File created today?
-		if upToDate(indexFile):
-			# Step 4: Prompt user to provide search string
-			# Step 5: Search and return results, if any
-			# END PROGRAM
-			print
-			print("--> Index found and appears up to date.")
-			searchIndex(indexFile)
-			print
-		else: # if upToDate(indexFile):
-			# Step 6: Ask user if they would like to update indexFile
-			# Update indexFile?
-			print
-			if confirm("The index does not appear up-to-date.\n\nWould you like to update it? [Y/n] "):
-				# Step 7: Prompt user for username & password
-				# Step 8: Login to routers and retrieve VRF, Peer information
-				# Step 9: Sort indexFile to remove unnecessary data
-				# GOTO Step 2 (Check for presence of indexFile file)
-				print
-				# Remove old indexFile to prevent duplicates from being added by appends
-				remove(indexFile)
-				routerLogin()
-				print
-				searchIndex(indexFile)
-			else: # if confirm("Would you like to update the index? [Y/n] "):
-				# GOTO Step 4: (Prompt user to provide search string)
-				# Step 5: Search and return results, if any
-				searchIndex(indexFile)
-				print
-	else: # if fileExist(indexFile):
-		# Step 7: Prompt user for username & password
-		# Step 8: Login to routers and retrieve VRF, Peer information
-		# Step 9: Sort indexFile to remove unnecessary data
-		# GOTO Step 2 (Check for presence of indexFile file)
+try:
+# Try to open configFile
+	with open(configFile, 'r'):
 		print
-		print("--> No index file found, we will create one now.")
-		print
-		routerLogin()
-		print
-		searchIndex(indexFile)
-		
-else: # if fileExist(routerFile):
-	# Step 10: Create example routerFile and exit program
-	# END PROGRAM	
+	
+except IOError:
+# Except if configFile does not exist, create an example configFile to work from
 	try:
-		with open (routerFile, 'w') as exampleFile:
-			exampleFile.write("192.168.1.1\n192.168.1.2\nRouterA\nRouterB\nRouterC\netc...")
+		with open (configFile, 'w') as exampleFile:
 			print
-			print "Required file "+routerFile+" not found; One has been created for you."
+			print "--> Config file not found; Creating "+configFile+"."
+			print
+			exampleFile.write("## VRFSearchTool.py CONFIGURATION FILE ##\n#\n")
+			exampleFile.write("[account]\n#password is base64 encoded! Plain text passwords WILL NOT WORK!\n#Use website such as http://www.base64encode.org/ to encode your password\nusername=\npassword=\n#\n")
+			exampleFile.write("[VRFSearchTool]\n#Check your paths! Files will be created; Directories will not.\n#Bad directories may result in errors!\n#variable=C:\path\\to\\filename.ext\nrouterFile=routers.txt\nindexFile=index.txt\nindexFileTmp=index.txt.tmp\n")
+	except IOError:
+		print "\n--> An error occurred creating the example "+configFile+".\n"
+
+finally:
+# Finally, using the provided configFile (or example created), pull values
+# from the config and login to the router(s)
+	config = ConfigParser(allow_no_value=True)
+	config.read(configFile)
+	username = config.get('account', 'username')
+	password = config.get('account', 'password')
+	routerFile = config.get('VRFSearchTool', 'routerFile')
+	indexFile = config.get('VRFSearchTool', 'indexFile')
+	indexFileTmp = config.get('VRFSearchTool', 'indexFileTmp')
+
+	# START PROGRAM
+	# Steps below refer to documented program flow in VRFSearchTool.png
+	# Step 1: Check for presence of routerFile
+	# Does routerFile exist?
+	if fileExist(routerFile):
+		# Step 2: Check for presence of indexFile file
+		# Does indexFile exist?
+		if fileExist(indexFile):
+			# Step 3: Check date of file
+			# File created today?
+			if upToDate(indexFile):
+				# Step 4: Prompt user to provide search string
+				# Step 5: Search and return results, if any
+				# END PROGRAM
+				print("--> Index found and appears up to date.")
+				searchIndex(indexFile)
+			else: # if upToDate(indexFile):
+				# Step 6: Ask user if they would like to update indexFile
+				# Update indexFile?
+				print
+				if confirm("--> The index does not appear up-to-date.\n\nWould you like to update it? [Y/n] "):
+					# Step 7: Prompt user for username & password
+					# Step 8: Login to routers and retrieve VRF, Peer information
+					# Step 9: Sort indexFile to remove unnecessary data
+					# GOTO Step 2 (Check for presence of indexFile file)
+
+					# Remove old indexFile to prevent duplicates from being added by appends
+					remove(indexFile)
+					routerLogin()
+					print
+					searchIndex(indexFile)
+				else: # if confirm("Would you like to update the index? [Y/n] "):
+					# GOTO Step 4: (Prompt user to provide search string)
+					# Step 5: Search and return results, if any
+					searchIndex(indexFile)
+		else: # if fileExist(indexFile):
+			# Step 7: Prompt user for username & password
+			# Step 8: Login to routers and retrieve VRF, Peer information
+			# Step 9: Sort indexFile to remove unnecessary data
+			# GOTO Step 2 (Check for presence of indexFile file)
+			print("--> No index file found, we will create one now.")
+			routerLogin()
+			print
+			searchIndex(indexFile)
+			
+	else: # if fileExist(routerFile):
+		# Step 10: Create example routerFile and exit program
+		# END PROGRAM	
+		try:
+			with open (routerFile, 'w') as exampleFile:
+				exampleFile.write("## VRFSearchTool.py ROUTER FILE ##\n#\n")
+				exampleFile.write("#Enter a list of hostnames or IP Addresses, one per line.\n#For example:\n")
+				exampleFile.write("192.168.1.1\n192.168.1.2\nRouterA\nRouterB\nRouterC\netc...")
+				print "--> Router file not found; Creating "+routerFile+"."
+				print "    Edit this file and restart the application."
+		except IOError:
+			print "--> Required file "+routerFile+" not found; An error has occurred creating "+routerFile+"."
 			print "This file must contain a list, one per line, of Hostnames or IP addresses the"
 			print "application will then connect to download the running-config."
-			print
-	except IOError:
-		print
-		print "Required file "+routerFile+" not found."
-		print "This file must contain a list, one per line, of Hostnames or IP addresses the"
-		print "application will then connect to download the running-config."
-		print
+
+print
+print "--> Done."
+raw_input()	# Pause for user input.
