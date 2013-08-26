@@ -43,7 +43,7 @@ from os							import name, path, remove, system
 
 def version():
 # This function tracks the application version.
-	return "v0.0.13-beta"
+	return "v0.0.14-beta"
 
 @autologin()		# Exscript login decorator; Must precede buildIndex!
 def buildIndex(job, host, socket):
@@ -253,30 +253,38 @@ def upToDate(fileName):
 configFile='settings.cfg'
 
 # Determine OS in use and clear screen of previous output
-system('cls' if name=='nt' else 'clear')
+if name == 'nt':
+	system("cls")
+else:
+	system("clear")
 
 # PRINT PROGRAM BANNER
 print "VRF Search Tool "+version()
 print "-"*(16+len(version()))
 
+# START PROGRAM
+# Steps below refer to documented program flow in VRFSearchTool.png
+# Step 1: Check for presence of settings.cfg file
 try:
 # Try to open configFile
 	with open(configFile, 'r'):
 		print
-	
+
+# Step 2: Create example settings.cfg file
 except IOError:
 # Except if configFile does not exist, create an example configFile to work from
 	try:
 		with open (configFile, 'w') as exampleFile:
 			print
 			print "--> Config file not found; Creating "+configFile+"."
-			print
 			exampleFile.write("## VRFSearchTool.py CONFIGURATION FILE ##\n#\n")
 			exampleFile.write("[account]\n#password is base64 encoded! Plain text passwords WILL NOT WORK!\n#Use website such as http://www.base64encode.org/ to encode your password\nusername=\npassword=\n#\n")
 			exampleFile.write("[VRFSearchTool]\n#Check your paths! Files will be created; Directories will not.\n#Bad directories may result in errors!\n#variable=C:\path\\to\\filename.ext\nrouterFile=routers.txt\nindexFile=index.txt\nindexFileTmp=index.txt.tmp\n")
 	except IOError:
-		print "\n--> An error occurred creating the example "+configFile+".\n"
+		print
+		print "--> An error occurred creating the example "+configFile+"."
 
+# Step 3: Open settings.cfg file and read options
 finally:
 # Finally, using the provided configFile (or example created), pull values
 # from the config and login to the router(s)
@@ -288,54 +296,49 @@ finally:
 	indexFile = config.get('VRFSearchTool', 'indexFile')
 	indexFileTmp = config.get('VRFSearchTool', 'indexFileTmp')
 
-	# START PROGRAM
-	# Steps below refer to documented program flow in VRFSearchTool.png
-	# Step 1: Check for presence of routerFile
+	
+	# Step 4: Check for presence of routerFile
 	# Does routerFile exist?
 	if fileExist(routerFile):
-		# Step 2: Check for presence of indexFile file
+		# Step 5: Check for presence of indexFile file
 		# Does indexFile exist?
 		if fileExist(indexFile):
-			# Step 3: Check date of file
+			# Step 6: Check date of file
 			# File created today?
 			if upToDate(indexFile):
-				# Step 4: Prompt user to provide search string
-				# Step 5: Search and return results, if any
-				# END PROGRAM
+				# Step 7: Prompt user to provide search string
+				# Step 8: Search and return results, if any and END PROGRAM
 				print("--> Index found and appears up to date.")
 				searchIndex(indexFile)
 			else: # if upToDate(indexFile):
-				# Step 6: Ask user if they would like to update indexFile
+				# Step 9: Ask user if they would like to update indexFile
 				# Update indexFile?
 				print
 				if confirm("--> The index does not appear up-to-date.\n\nWould you like to update it? [Y/n] "):
-					# Step 7: Prompt user for username & password
-					# Step 8: Login to routers and retrieve VRF, Peer information
-					# Step 9: Sort indexFile to remove unnecessary data
+					# Step 10: Prompt user for username & password (if not stored in settings.cfg)
+					# Step 11: Login to routers and retrieve VRF, Peer information
+					# Step 12: Sort indexFile to remove unnecessary data
 					# GOTO Step 2 (Check for presence of indexFile file)
-
 					# Remove old indexFile to prevent duplicates from being added by appends
 					remove(indexFile)
 					routerLogin()
 					print
 					searchIndex(indexFile)
 				else: # if confirm("Would you like to update the index? [Y/n] "):
-					# GOTO Step 4: (Prompt user to provide search string)
-					# Step 5: Search and return results, if any
+					# GOTO Step 7: (Prompt user to provide search string)
+					# Step 8: Search and return results, if any and END PROGRAM
 					searchIndex(indexFile)
 		else: # if fileExist(indexFile):
-			# Step 7: Prompt user for username & password
-			# Step 8: Login to routers and retrieve VRF, Peer information
-			# Step 9: Sort indexFile to remove unnecessary data
+			# Step 10: Prompt user for username & password (if not stored in settings.cfg)
+			# Step 11: Login to routers and retrieve VRF, Peer information
+			# Step 12: Sort indexFile to remove unnecessary data
 			# GOTO Step 2 (Check for presence of indexFile file)
 			print("--> No index file found, we will create one now.")
 			routerLogin()
 			print
 			searchIndex(indexFile)
-			
 	else: # if fileExist(routerFile):
-		# Step 10: Create example routerFile and exit program
-		# END PROGRAM	
+		# Step 13: Create example routerFile and exit program and END PROGRAM	
 		try:
 			with open (routerFile, 'w') as exampleFile:
 				exampleFile.write("## VRFSearchTool.py ROUTER FILE ##\n#\n")
