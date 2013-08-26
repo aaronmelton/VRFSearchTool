@@ -2,12 +2,6 @@
 ----------
 
 ## Needs Fixing ##
-- [X] Need error-checking for user input (searchCriteria)
-- [X] Remove unnecessary debugging comments
-- [X] Update README.md to match actual application functionality
-- [X] Extend spacing on fields to fit larger VRF names
-- [X] Application crashes when searching for less than two character string
-- [ ] Update README.md, VRFSearchTool.png
 
 ## New Features ##
 

@@ -2,8 +2,8 @@
 ---
 
 ## VRFSearchTool v0.0.14-beta (2013-08-26) ##
-* Updated README.md, VRFSearchTool.png, code comments to reflect current 
-  Functionality.
+* Updated README.md, VRFSearchTool.png, TODO.md code comments to reflect current 
+  Functionality.  Removed unused modules.
 
 ## VRFSearchTool v0.0.13-beta (2013-08-20) ##
 * Adjusted output spacing (removing/moving 'print' statements)

@@ -21,7 +21,7 @@
 import base64		# Required to decode password
 import datetime		# Required for date format
 import ConfigParser # Required for configuration file
-import Exscript		# Required for SSH, queue & logging functionality
+import Exscript		# Required for SSH, queue functionality
 import re			# Required for REGEX operations
 import sys			# Required for printing without newline
 import os			# Required to determine OS of host
@@ -32,10 +32,8 @@ from datetime                   import datetime
 from Exscript                   import Account, Queue, Host, Logger
 from Exscript.protocols 		import SSH2
 from Exscript.util.file			import get_hosts_from_file
-from Exscript.util.log          import log_to
 from Exscript.util.decorator    import autologin
 from Exscript.util.interact     import read_login
-from Exscript.util.report		import status,summarize
 from re							import search, sub
 from sys						import stdout
 from os							import name, path, remove, system
@@ -178,9 +176,6 @@ def routerLogin():
 		queue.run(hosts, buildIndex)			# Create queue using provided hosts
 		queue.shutdown()						# End all running threads and close queue
 		
-		#print status(Logger())	# Print current % status of operation to screen
-								# Status not useful unless # threads > 1
-
 	# Exception: router file was not able to be opened
 	except IOError:
 		print
@@ -295,7 +290,6 @@ finally:
 	routerFile = config.get('VRFSearchTool', 'routerFile')
 	indexFile = config.get('VRFSearchTool', 'indexFile')
 	indexFileTmp = config.get('VRFSearchTool', 'indexFileTmp')
-
 	
 	# Step 4: Check for presence of routerFile
 	# Does routerFile exist?
