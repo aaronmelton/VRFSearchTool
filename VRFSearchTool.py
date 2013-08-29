@@ -31,14 +31,16 @@ from argparse					import ArgumentParser, RawDescriptionHelpFormatter
 from base64						import b64decode
 from ConfigParser				import ConfigParser
 from datetime                   import datetime
-from Exscript                   import Account, Queue, Host
+from Exscript                   import Account, Queue, Host, Logger
 from Exscript.protocols 		import SSH2
 from Exscript.util.file			import get_hosts_from_file
+from Exscript.util.log          import log_to
 from Exscript.util.decorator    import autologin
 from Exscript.util.interact     import read_login
+from Exscript.util.report		import status,summarize
 from re							import search, sub
 from sys						import stdout
-from os							import name, path, remove, system
+from os							import makedirs, name, path, remove, system
 
 
 class Application:
@@ -46,13 +48,15 @@ class Application:
 # details across all my applications.  Also used to display information when
 # application is executed with "--help" argument.
 	author = "Aaron Melton <aaron@aaronmelton.com>"
-	date = "(2013-08-28)"
+	date = "(2013-08-29)"
 	description = "Search for VRF names across multiple Cisco routers."
 	name = "VRFSearchTool.py"
 	url = "https://github.com/aaronmelton/VRFSearchTool"
-	version = "v0.0.15-beta"
+	version = "v0.0.16-beta"
 
 
+logger = Logger()	# Log stuff
+@log_to(logger)		# Logging decorator; Must precede buildIndex!
 @autologin()		# Exscript login decorator; Must precede buildIndex!
 def buildIndex(job, host, socket):
 # This function builds the index file by connecting to the router and extracting all
@@ -181,12 +185,38 @@ def routerLogin():
 		else:							# Else use username/password from configFile
 			account = Account(name=username, password=b64decode(password))
 		
-		queue = Queue(verbose=0, max_threads=1)	# Minimal message from queue, 1 threads
+		# Minimal message from queue, 1 threads
+		queue = Queue(verbose=0, max_threads=1, stderr=(open(os.devnull, 'w')))
 		queue.add_account(account)				# Use supplied user credentials
 		print
 		stdout.write("--> Building index...") 	# Print without trailing newline
 		queue.run(hosts, buildIndex)			# Create queue using provided hosts
 		queue.shutdown()						# End all running threads and close queue
+
+		# Define log filename based on date
+		logFilename = logFileDirectory+'VRFSearchTool_'+date+'.log'
+
+		# Check to see if logFilename currently exists.  If it does, append an
+		# integer onto the end of the filename until logFilename no longer exists
+		incrementLogFilename = 1
+		while fileExist(logFilename):
+			logFilename = logFileDirectory+'VRFSearchTool_'+date+'_'+str(incrementLogFilename)+'.log'
+			incrementLogFilename = incrementLogFilename + 1
+
+		# Write log results to logFile
+		with open(logFilename, 'w') as outputLogFile:
+			try:
+				outputLogFile.write(summarize(logger))
+
+			# Exception: router file was not able to be opened
+			except IOError:
+				print
+				print "--> An error occurred opening "+logFileDirectory+logFile+"."
+
+	# Exception: routerFile could not be opened
+	except IOError:
+		print
+		print "--> An error occurred opening "+routerFile+"."
 		
 	# Exception: routerFile could not be opened
 	except IOError:
@@ -296,7 +326,7 @@ except IOError:
 			print "--> Config file not found; Creating "+configFile+"."
 			exampleFile.write("## VRFSearchTool.py CONFIGURATION FILE ##\n#\n")
 			exampleFile.write("[account]\n#password is base64 encoded! Plain text passwords WILL NOT WORK!\n#Use website such as http://www.base64encode.org/ to encode your password\nusername=\npassword=\n#\n")
-			exampleFile.write("[VRFSearchTool]\n#Check your paths! Files will be created; Directories will not.\n#Bad directories may result in errors!\n#variable=C:\path\\to\\filename.ext\nrouterFile=routers.txt\nindexFile=index.txt\nindexFileTmp=index.txt.tmp\n")
+			exampleFile.write("[VRFSearchTool]#variable=C:\path\\to\\filename.ext\nrouterFile=routers.txt\nindexFile=index.txt\nindexFileTmp=index.txt.tmp\nlogFileDirectory=\n")
 	
 	# Exception: configFile could not be created
 	except IOError:
@@ -314,7 +344,18 @@ finally:
 	routerFile = config.get('VRFSearchTool', 'routerFile')
 	indexFile = config.get('VRFSearchTool', 'indexFile')
 	indexFileTmp = config.get('VRFSearchTool', 'indexFileTmp')
+	logFileDirectory = config.get('VRFSearchTool', 'logFileDirectory')
+
+	# If logFileDirectory does not contain trailing backslash, append one
+	if logFileDirectory != '':
+		if logFileDirectory[-1:] != "\\":
+			logFileDirectory = logFileDirectory+"\\"
+			if not path.exists(logFileDirectory): makedirs(logFileDirectory)
 	
+	# Define 'date' variable for use in the output filename
+	date = datetime.now()	# Determine today's date
+	date = date.strftime('%Y%m%d')	# Format date as YYYYMMDD
+
 	# Step 4: Check for presence of routerFile
 	# Does routerFile exist?
 	if fileExist(routerFile):
@@ -352,6 +393,7 @@ finally:
 			# Step 11: Login to routers and retrieve VRF, Peer information
 			# Step 12: Sort indexFile to remove unnecessary data
 			# GOTO Step 2 (Check for presence of indexFile file)
+			print
 			print("--> No index file found, we will create one now.")
 			routerLogin()
 			print
