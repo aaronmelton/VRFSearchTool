@@ -1,6 +1,14 @@
 # VRFSearchTool.py #
 ---
 
+## VRFSearchTool v0.0.17-beta (2013-09-09) ##
+* Corrected makedirs() functionality: Directories with a trailing backslash
+  in the config file were not being created thereby causing the application
+  to fail.
+* Moved logFileDirectory makedirs() function such that the
+  directory would only be created if/when the parent function was called
+  instead of creating the directory whenever the application executed.
+
 ## VRFSearchTool v0.0.16-beta (2013-08-29) ##
 * Added basic logging to file to track results if application has to connect
   to a router to run buildIndex().

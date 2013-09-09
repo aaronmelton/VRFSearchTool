@@ -48,11 +48,11 @@ class Application:
 # details across all my applications.  Also used to display information when
 # application is executed with "--help" argument.
 	author = "Aaron Melton <aaron@aaronmelton.com>"
-	date = "(2013-08-29)"
+	date = "(2013-09-09)"
 	description = "Search for VRF names across multiple Cisco routers."
 	name = "VRFSearchTool.py"
 	url = "https://github.com/aaronmelton/VRFSearchTool"
-	version = "v0.0.16-beta"
+	version = "v0.0.17-beta"
 
 
 logger = Logger()	# Log stuff
@@ -185,13 +185,16 @@ def routerLogin():
 		else:							# Else use username/password from configFile
 			account = Account(name=username, password=b64decode(password))
 		
-		# Minimal message from queue, 1 threads
+		# Minimal message from queue, 1 threads, redirect errors to null
 		queue = Queue(verbose=0, max_threads=1, stderr=(open(os.devnull, 'w')))
 		queue.add_account(account)				# Use supplied user credentials
 		print
 		stdout.write("--> Building index...") 	# Print without trailing newline
 		queue.run(hosts, buildIndex)			# Create queue using provided hosts
 		queue.shutdown()						# End all running threads and close queue
+
+		# If logFileDirectory does not exist, create it.
+		if not path.exists(logFileDirectory): makedirs(logFileDirectory)
 
 		# Define log filename based on date
 		logFilename = logFileDirectory+'VRFSearchTool_'+date+'.log'
@@ -348,9 +351,7 @@ finally:
 
 	# If logFileDirectory does not contain trailing backslash, append one
 	if logFileDirectory != '':
-		if logFileDirectory[-1:] != "\\":
-			logFileDirectory = logFileDirectory+"\\"
-			if not path.exists(logFileDirectory): makedirs(logFileDirectory)
+		if logFileDirectory[-1:] != "\\": logFileDirectory = logFileDirectory+"\\"
 	
 	# Define 'date' variable for use in the output filename
 	date = datetime.now()	# Determine today's date
