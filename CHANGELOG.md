@@ -1,6 +1,12 @@
 # VRFSearchTool.py #
 ---
 
+## VRFSearchTool v0.0.18-beta (2014-03-17) ##
+* Replaced tab with four spaces.
+* Replaced ' with " to be consistent throughout the file.
+* Corrected problem where application would fail if logFileDirectory or 
+  resultsFileDirectory in settings.cfg was blank.
+
 ## VRFSearchTool v0.0.17-beta (2013-09-09) ##
 * Corrected makedirs() functionality: Directories with a trailing backslash
   in the config file were not being created thereby causing the application
